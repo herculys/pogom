@@ -41,6 +41,7 @@ function pad(num, size) {
 
 document.getElementById('pokemon-checkbox').checked = getFromStorage("displayPokemons", "true");
 document.getElementById('gyms-checkbox').checked = getFromStorage("displayGyms", "true");
+document.getElementById('pokestops-checkbox').checked = getFromStorage("displayPokestops", true);
 document.getElementById('coverage-checkbox').checked = getFromStorage("displayCoverage", "true");
 
 
@@ -275,10 +276,15 @@ function gymLabel(team_name, team_id, gym_points) {
     return str;
 }
 
+function pokestopLabel() {
+    var label = "Pokestop";
+    return label;
+}
 
 var map_pokemons = {}; // dict containing all pokemons on the map.
 var map_gyms = {};
 var gym_types = [ "Uncontested", "Mystic", "Valor", "Instinct" ];
+var map_pokestops = {};
 
 function setupPokemonMarker(item) {
     var myIcon = new google.maps.MarkerImage('static/icons/'+item.pokemon_id+'.png', null, null, null, new google.maps.Size(30,30));
@@ -317,6 +323,21 @@ function setupGymMarker(item) {
     return marker;
 }
 
+function setupPokestopMarker(item) {
+    var marker = new google.maps.Marker({
+        position: {lat: item.latitude, lng: item.longitude},
+        map: map,
+        icon: 'static/forts/Pstop.png'
+    });
+
+    marker.infoWindow = new google.maps.InfoWindow({
+        content: pokestopLabel(),
+        disableAutoPan: true
+    });
+
+    addListeners(marker);
+    return marker;
+}
 function addListeners(marker){
     marker.addListener('click', function() {
         marker.infoWindow.open(map, marker);
@@ -463,6 +484,7 @@ function updateMap() {
         url: "map-data",
         type: 'GET',
         data: {'pokemon': localStorage.displayPokemons,
+			   'pokestops': document.getElementById('pokestops-checkbox').checked,
                'gyms': localStorage.displayGyms},
         dataType: "json"
     }).done(function(result) {
@@ -515,6 +537,16 @@ function updateMap() {
             }
         });
 
+        $.each(result.pokestops, function(i, item) {
+            if (!document.getElementById('pokestops-checkbox').checked) {
+                return false; // in case the checkbox was unchecked in the meantime.
+            }
+            
+            if (!(item.pokestop_id in map_pokestops)) {
+                item.marker = setupPokestopMarker(item);
+                map_pokestops[item.pokestop_id] = item;
+            }
+        });
         clearStaleMarkers();
     }).fail(function() {
         $lastRequestLabel.removeClass('label-success label-warning');
@@ -560,6 +592,17 @@ $('#coverage-checkbox').change(function() {
     }, this);
 });
 
+$('#pokestops-checkbox').change(function() {
+    localStorage.displayPokestops = this.checked;
+    if (this.checked) {
+        updateMap();
+    } else {
+        $.each(map_pokestops, function(key, value) {
+            map_pokestops[key].marker.setMap(null);
+        });
+        map_pokestops = {}
+    }
+});
 
 // function displayCoverage() {
 //     // if (currentLocationMarker) currentLocationMarker.setMap(null);
